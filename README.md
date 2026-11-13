@@ -10,13 +10,21 @@
 
 当前包声明兼容 **DSH 0.2.2-rc.2**；新机器安装前检查实际版本，不绕过不兼容检查。
 
-## 重要：当前运行目录未迁移
+## 当前运行目录：已切换到本仓库
 
-本仓库于 2026-11-13 从工作区复制代码、构建源文件和测试。排除了 `data/`、`node_modules/` 和私人备份。当前公司电脑已安装的插件仍链接到：
+2026-11-13 已通过 Plugin Manager 逐个卸载旧链接、重新安装三个仓库目录，三次安装均报告 `application: applied`。当前 profile 的三个实际链接已核对为：
 
-`/Users/nereus/Documents/deepseek-harness/default-workspace/`
+```text
+/Users/nereus/Documents/AIRepositories/ds_plugins/harness-knowledge-plugin
+/Users/nereus/Documents/AIRepositories/ds_plugins/harness-me-plugin
+/Users/nereus/Documents/AIRepositories/ds_plugins/harness-todo-plugin
+```
 
-本次没有重新安装/改链接，因此修改本仓库不会自动改变当前 GUI。不要删除原工作区插件目录。后续切换运行路径应先备份，再通过插件管理器卸载/安装，并验证数据；尤其条目和 Todo 数据目前位于旧插件目录内。
+以后只在本仓库修改代码。修改后构建相应客户端、按需通过 Plugin Manager 重载，并刷新当前 GUI；本仓库没有自动构建 watcher。Git 提交或推送不会自动让家里电脑安装更新。
+
+条目/Todo 的完整本地数据已在停用插件后复制到本仓库相应 `data/`，受 `.gitignore` 保护，不可提交；Me 继续使用 `~/.dsh/me/me.json`。node_modules 已从同版本本机工作依赖准备，仅供本机运行，不可提交，换机需重新安装依赖。
+
+迁移前私人快照在 `~/.dsh/plugin-migration-backups/20261113-181244/`。旧工作区目录保留为备份，已不被当前 profile 引用，后续不要再编辑那份。迁移未删除旧数据、未上传云端。
 
 ## 构建结构
 
@@ -52,9 +60,10 @@ node --test harness-me-plugin/test/*.test.mjs
 
 - 三个插件均在本仓库重新构建成功。
 - 条目与 Todo 共36项测试通过。
-- Me 共43项测试通过；另3个测试文件因本仓库尚未安装 `@deepseek-ai/dsh-tools` 等 peer 依赖而无法加载，尚不能宣称完整测试通过。准备兼容依赖后应重跑全部 Me 测试。
-- 未从此目录重新安装或做 GUI 验收；当前运行仍使用旧工作区路径。
-- 检查未复制个人 data/ 和 node_modules/，Git ignore 覆盖其路径。
+- 准备兼容本机依赖后，Me 全部53项测试通过。
+- 三插件均从本仓库重新安装成功；profile 实际链接核对通过。尚未人工验收刷新后的页面交互。
+- 条目数据 revision 20 / 3条、Todo revision 11 / 2条迁移校验通过；Me 原路径未改变。
+- 本机运行 data/ 和 node_modules/ 受 Git ignore 保护；初次代码整理未包含这些内容，后续迁移仅在本机补入。提交前务必检查 staged diff。
 
 新机安装与坚果云流程详见 [同步与换机.md](同步与换机.md)。每个插件原 README 保留历史开发说明；版本与实时行为以当前 package.json 和代码为准。
 
