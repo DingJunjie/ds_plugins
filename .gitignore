@@ -1,0 +1,20 @@
+# Dependencies / caches
+**/node_modules/
+**/.pnpm-store/
+**/__pycache__/
+.DS_Store
+*.log
+
+# Never commit personal data / exports / backups
+**/data/
+backups/
+exports/
+*.localbak
+.env
+.env.*
+!.env.example
+
+# Local credentials / machine configuration
+.npmrc.local
+**/credentials.json
+**/secrets.json

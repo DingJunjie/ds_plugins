@@ -1,0 +1,23 @@
+{
+  "name": "harness-me-local",
+  "version": "0.6.1",
+  "description": "Me：本地个人背景、日常记录、按需跨会话记忆与可还原备份",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": { ".": "./lib/index.js", "./client": "./lib/client.js", "./package.json": "./package.json" },
+  "files": ["lib", "cordis.patch.yml", "README.md"],
+  "scripts": { "build": "node build.mjs", "test": "node --test test/*.test.mjs" },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-subagent": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-agent": "0.2.2-rc.2"
+  },
+  "engines": { "dsh": "0.2.2-rc.2" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-connection"] }
+  }
+}

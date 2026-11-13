@@ -1,0 +1,3 @@
+- insert:
+    - id: local-todo-panel
+      name: harness-todo-local

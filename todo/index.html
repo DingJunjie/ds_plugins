@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>待办清单</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>">
+<style>
+  /* ---------- tokens ---------- */
+  :root {
+    --bg: #f7f3ec;
+    --surface: #fffdf8;
+    --surface-2: #f3ece0;
+    --ink: #241f19;
+    --ink-soft: #4d453c;
+    --muted: #8d8375;
+    --line: #e7ddcc;
+    --accent: #c9633f;
+    --accent-deep: #a9482a;
+    --accent-wash: #f7e5dc;
+    --blue: #5f7f9b;
+    --ok: #6f8f6a;
+    --shadow-1: 0 1px 2px rgba(60, 45, 30, .05), 0 8px 24px -12px rgba(60, 45, 30, .18);
+    --shadow-2: 0 2px 4px rgba(60, 45, 30, .06), 0 24px 60px -28px rgba(60, 45, 30, .35);
+    --radius: 26px;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #14110e;
+    --surface: #1c1815;
+    --surface-2: #262019;
+    --ink: #f4ede2;
+    --ink-soft: #d7ccbd;
+    --muted: #948a7c;
+    --line: #322a22;
+    --accent: #e08a64;
+    --accent-deep: #f0a887;
+    --accent-wash: #3a2620;
+    --blue: #8ca9c4;
+    --ok: #93b28c;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 26px -14px rgba(0, 0, 0, .6);
+    --shadow-2: 0 2px 4px rgba(0, 0, 0, .35), 0 30px 70px -30px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    padding: clamp(28px, 7vh, 84px) 20px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background .45s ease, color .45s ease;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -25%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(38% 32% at 18% 8%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%),
+      radial-gradient(34% 30% at 88% 4%, color-mix(in oklab, var(--blue) 20%, transparent), transparent 72%),
+      radial-gradient(46% 38% at 72% 100%, rgba(198, 168, 106, .22), transparent 72%);
+    filter: blur(14px);
+    opacity: .9;
+  }
+
+  ::selection { background: var(--accent-wash); color: var(--ink); }
+
+  /* ---------- shell ---------- */
+  .app { width: min(660px, 100%); margin: 0 auto; }
+
+  .hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 26px; padding: 0 6px; }
+  .eyebrow {
+    margin: 0 0 10px; font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  h1 {
+    margin: 0; font-family: ui-serif, Georgia, "Songti SC", "Noto Serif SC", "STSong", serif;
+    font-size: clamp(34px, 6vw, 46px); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+  }
+  h1 .dot { color: var(--accent); }
+  .sub { margin: 10px 0 0; font-size: 13.5px; color: var(--muted); letter-spacing: .01em; }
+
+  /* progress ring */
+  .ring { position: relative; width: 66px; height: 66px; flex: none; margin-top: 6px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .ring circle { fill: none; stroke-width: 4.5; stroke-linecap: round; }
+  .ring .track { stroke: var(--line); }
+  .ring .bar { stroke: var(--accent); transition: stroke-dashoffset .7s cubic-bezier(.3, .9, .25, 1); }
+  .ring .pct {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 12.5px; font-weight: 650; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- card ---------- */
+  .card {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-2);
+    padding: 26px 26px 18px;
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    transition: background .45s ease, border-color .45s ease;
+  }
+
+  /* composer */
+  .composer-main { display: flex; align-items: center; gap: 12px; }
+  .composer-main .plus {
+    width: 26px; height: 26px; flex: none; display: grid; place-items: center;
+    border-radius: 50%; background: var(--accent-wash); color: var(--accent);
+    font-size: 18px; font-weight: 500; line-height: 1; padding-bottom: 2px;
+    transition: transform .35s cubic-bezier(.34, 1.56, .64, 1), background .3s;
+  }
+  .composer:focus-within .plus { transform: rotate(90deg) scale(1.06); background: var(--accent); color: #fff; }
+  #newTask {
+    flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink);
+    font: inherit; font-size: 16.5px; padding: 8px 0; outline: none; letter-spacing: .01em;
+  }
+  #newTask::placeholder { color: var(--muted); opacity: .85; }
+  .add-btn {
+    flex: none; border: 0; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 600;
+    padding: 9px 18px; border-radius: 100px; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--accent) 80%, transparent);
+    transition: transform .18s ease, filter .18s ease, opacity .18s;
+  }
+  .add-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .add-btn:active { transform: translateY(0) scale(.98); }
+  .add-btn:disabled { opacity: .35; cursor: default; transform: none; box-shadow: none; }
+
+  .composer-meta {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .4s cubic-bezier(.4, 0, .2, 1), opacity .3s ease, margin .4s ease;
+  }
+  .composer:focus-within .composer-meta, .composer.open .composer-meta {
+    max-height: 96px; opacity: 1; margin-top: 14px;
+  }
+  .field { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .date-wrap { position: relative; display: inline-flex; }
+  .date-wrap .ph {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 12.5px; color: var(--muted); pointer-events: none; transition: opacity .2s ease;
+  }
+  .date-wrap.filled .ph, .date-wrap:focus-within .ph { opacity: 0; }
+  .field input[type="date"] {
+    font: inherit; font-size: 12.5px; color: var(--ink-soft); background: var(--surface-2);
+    border: 1px solid transparent; border-radius: 10px; padding: 6px 9px; outline: none;
+    width: 126px; transition: border-color .2s, background .2s;
+  }
+  .field input[type="date"]:focus { border-color: var(--accent); }
+  .date-wrap:not(.filled):not(:focus-within) input[type="date"]::-webkit-datetime-edit { color: transparent; }
+  .prio { display: inline-flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 11px; }
+  .prio button {
+    border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 12px;
+    color: var(--muted); padding: 4px 11px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .2s, color .2s;
+  }
+  .prio button i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .55; }
+  .prio button[data-p="high"] i { background: var(--accent); }
+  .prio button[data-p="mid"]  i { background: #d8a13c; }
+  .prio button[data-p="low"]  i { background: var(--blue); }
+  .prio button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+  .hint { margin-left: auto; font-size: 11.5px; color: var(--muted); opacity: .75; }
+
+  /* filters */
+  .bar { display: flex; align-items: center; gap: 8px; margin: 22px 0 4px; }
+  .filters { display: inline-flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 12px; }
+  .filters button {
+    border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--muted); padding: 6px 13px; border-radius: 9px; letter-spacing: .02em;
+    transition: background .25s, color .25s, box-shadow .25s;
+  }
+  .filters button b { font-weight: 600; opacity: .65; margin-left: 5px; font-variant-numeric: tabular-nums; }
+  .filters button:hover { color: var(--ink-soft); }
+  .filters button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+
+  /* list */
+  .list { list-style: none; margin: 10px 0 0; padding: 0; }
+  .task {
+    display: flex; align-items: flex-start; gap: 13px; padding: 13px 10px 13px 6px;
+    border-radius: 14px; position: relative;
+    transition: background .22s ease, opacity .25s ease, transform .25s ease;
+  }
+  .task.anim { animation: slideIn .34s cubic-bezier(.22, .9, .3, 1) both; }
+  .task + .task::before {
+    content: ""; position: absolute; left: 42px; right: 12px; top: 0; height: 1px;
+    background: var(--line); opacity: .75;
+  }
+  .task:hover { background: color-mix(in oklab, var(--surface-2) 55%, transparent); }
+  .task.dragging { opacity: .35; }
+  .task.drop-before::after {
+    content: ""; position: absolute; left: 42px; right: 12px; top: -1px; height: 2px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .task.removing { opacity: 0; transform: translateX(14px) scale(.98); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .check {
+    flex: none; width: 22px; height: 22px; margin-top: 2px; padding: 0;
+    border-radius: 50%; border: 1.6px solid color-mix(in oklab, var(--muted) 55%, transparent);
+    background: transparent; cursor: pointer; display: grid; place-items: center;
+    transition: border-color .25s, background .25s, transform .2s;
+  }
+  .check:hover { border-color: var(--accent); transform: scale(1.08); }
+  .check svg { width: 12px; height: 12px; stroke: #fff; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .check svg path { stroke-dasharray: 18; stroke-dashoffset: 18; transition: stroke-dashoffset .3s ease .05s; }
+  .task.done .check { background: var(--ok); border-color: var(--ok); }
+  .task.done .check svg path { stroke-dashoffset: 0; }
+
+  .body { flex: 1; min-width: 0; padding-top: 1px; }
+  .text {
+    position: relative; display: inline-block; max-width: 100%;
+    font-size: 15.5px; line-height: 1.5; color: var(--ink); word-break: break-word;
+    transition: color .3s ease; cursor: text;
+  }
+  .text::after {
+    content: ""; position: absolute; left: -1px; top: 54%; height: 1.4px; width: calc(100% + 2px);
+    background: currentColor; border-radius: 2px;
+    transform: scaleX(0); transform-origin: left; transition: transform .34s cubic-bezier(.4, 0, .2, 1);
+  }
+  .task.done .text { color: var(--muted); }
+  .task.done .text::after { transform: scaleX(1); }
+
+  .meta { display: flex; align-items: center; gap: 7px; margin-top: 6px; flex-wrap: wrap; }
+  .meta:empty { display: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; line-height: 1; padding: 4px 8px; border-radius: 7px;
+    background: var(--surface-2); color: var(--muted); letter-spacing: .01em;
+  }
+  .chip i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .chip.high { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+  .chip.mid  { color: #b5842f; background: color-mix(in oklab, #d8a13c 15%, var(--surface)); }
+  .chip.low  { color: var(--blue); background: color-mix(in oklab, var(--blue) 13%, var(--surface)); }
+  .chip.due.overdue { color: #c0453a; background: color-mix(in oklab, #c0453a 13%, var(--surface)); }
+  .chip.due.today { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+  .task.done .meta { opacity: .55; }
+
+  .actions { display: flex; gap: 2px; flex: none; opacity: 0; transform: translateX(4px); transition: opacity .2s, transform .2s; }
+  .task:hover .actions, .task:focus-within .actions { opacity: 1; transform: none; }
+  .icon {
+    width: 28px; height: 28px; border: 0; background: transparent; border-radius: 8px; cursor: pointer;
+    display: grid; place-items: center; color: var(--muted); transition: background .18s, color .18s;
+  }
+  .icon:hover { background: var(--surface-2); color: var(--ink); }
+  .icon.del:hover { color: #c0453a; }
+  .icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  .edit-input {
+    width: 100%; font: inherit; font-size: 15.5px; line-height: 1.5; color: var(--ink);
+    background: transparent; border: 0; border-bottom: 1.5px solid var(--accent);
+    padding: 0 0 4px; outline: none;
+  }
+
+  /* empty state */
+  .empty { display: none; padding: 40px 10px 34px; text-align: center; }
+  .empty.show { display: block; animation: slideIn .4s ease both; }
+  .empty .orb {
+    width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%;
+    border: 1.5px dashed color-mix(in oklab, var(--muted) 45%, transparent);
+    display: grid; place-items: center; font-size: 20px; color: var(--muted);
+  }
+  .empty p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .empty .t { font-size: 15px; color: var(--ink-soft); margin-bottom: 5px; font-weight: 500; }
+
+  /* footer */
+  .ft { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding: 14px 2px 2px; border-top: 1px solid var(--line); }
+  .ft .count { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ft .count b { color: var(--ink-soft); font-weight: 600; }
+  .ft-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .ghost {
+    border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    padding: 7px 12px; border-radius: 10px; background: transparent; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; transition: background .2s, color .2s;
+  }
+  .ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .ghost svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .ghost.primary { color: var(--accent); background: var(--accent-wash); }
+  .ghost.primary:hover { background: color-mix(in oklab, var(--accent) 20%, var(--surface)); color: var(--accent-deep); }
+
+  .foot-tip { margin: 18px 0 0; text-align: center; font-size: 11.5px; color: var(--muted); opacity: .8; letter-spacing: .02em; }
+  kbd {
+    font: inherit; font-size: 10.5px; padding: 2px 6px; border-radius: 5px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-soft);
+  }
+
+  /* theme toggle */
+  .theme-btn {
+    position: fixed; top: 20px; right: 20px; z-index: 20;
+    width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
+    border: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 85%, transparent);
+    color: var(--ink-soft); display: grid; place-items: center;
+    box-shadow: var(--shadow-1); backdrop-filter: blur(10px);
+    transition: transform .3s ease, background .3s, color .3s;
+  }
+  .theme-btn:hover { transform: rotate(18deg) scale(1.05); }
+  .theme-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 34px; transform: translate(-50%, 24px);
+    background: #25201b; color: #f6efe5; font-size: 13px; padding: 11px 18px; border-radius: 100px;
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .7);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .4s cubic-bezier(.2, 1.4, .4, 1);
+    z-index: 50; white-space: nowrap; max-width: 90vw;
+  }
+  [data-theme="dark"] .toast { background: #f4ede2; color: #201b16; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 520px) {
+    .card { padding: 20px 16px 14px; border-radius: 22px; }
+    .ft-actions { width: 100%; justify-content: center; }
+    .hd { align-items: center; }
+    .ring { width: 54px; height: 54px; }
+    .task { padding: 12px 4px; }
+    .hint { display: none; }
+    .ft { justify-content: center; }
+    .ft .count { width: 100%; text-align: center; }
+    .composer-meta { gap: 10px; }
+    .foot-tip { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<button class="theme-btn" id="themeBtn" aria-label="切换深浅色" title="切换深浅色"></button>
+
+<main class="app">
+  <header class="hd">
+    <div>
+      <p class="eyebrow" id="eyebrow">Today</p>
+      <h1>待办清单<span class="dot">.</span></h1>
+      <p class="sub" id="sub">写点什么，然后一件件划掉它。</p>
+    </div>
+    <div class="ring" aria-hidden="true">
+      <svg viewBox="0 0 66 66">
+        <circle class="track" cx="33" cy="33" r="28"></circle>
+        <circle class="bar" id="ringBar" cx="33" cy="33" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93"></circle>
+      </svg>
+      <span class="pct" id="pct">0%</span>
+    </div>
+  </header>
+
+  <section class="card">
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="composer-main">
+        <span class="plus" aria-hidden="true">+</span>
+        <input id="newTask" placeholder="添加一件要记得的事…" maxlength="200" aria-label="新待办">
+        <button class="add-btn" type="submit" id="addBtn">添加</button>
+      </div>
+      <div class="composer-meta">
+        <label class="field">截止
+          <span class="date-wrap" id="dateWrap">
+            <input type="date" id="dueInput" aria-label="截止日期">
+            <span class="ph" aria-hidden="true">选择日期</span>
+          </span>
+        </label>
+        <div class="prio" id="prio" role="group" aria-label="优先级">
+          <button type="button" data-p="high"><i></i>高</button>
+          <button type="button" data-p="mid" class="on"><i></i>中</button>
+          <button type="button" data-p="low"><i></i>低</button>
+        </div>
+        <span class="hint">Enter 快速添加</span>
+      </div>
+    </form>
+
+    <div class="bar">
+      <div class="filters" id="filters">
+        <button data-f="all" class="on">全部<b>0</b></button>
+        <button data-f="active">进行中<b>0</b></button>
+        <button data-f="done">已完成<b>0</b></button>
+      </div>
+    </div>
+
+    <ul class="list" id="list" aria-live="polite"></ul>
+
+    <div class="empty" id="empty">
+      <div class="orb">✦</div>
+      <p class="t" id="emptyTitle">还空着</p>
+      <p id="emptyText">在上面输入一件事，按下 Enter 就行。</p>
+    </div>
+
+    <footer class="ft">
+      <span class="count" id="footerCount"></span>
+      <div class="ft-actions">
+        <button class="ghost" id="copyBtn" title="复制 Markdown 到剪贴板">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15"/></svg>
+          复制
+        </button>
+        <button class="ghost primary" id="exportBtn" title="下载 .md 文件">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
+          导出 Markdown
+        </button>
+        <button class="ghost" id="clearBtn" title="删除所有已完成">清除已完成</button>
+      </div>
+    </footer>
+  </section>
+
+  <p class="foot-tip"><kbd>/</kbd> 聚焦输入框 · <kbd>⌘/Ctrl</kbd> + <kbd>Enter</kbd> 添加 · 拖拽可排序 · 数据存在本地</p>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const KEY = "lumen.todo.v1";
+  const P_LABEL = { high: "高", mid: "中", low: "低" };
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------------- state ---------------- */
+  const todayISO = () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const shiftISO = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+
+  const seed = () => ([
+    { id: uid(), text: "把今天的三个重点写下来", done: false, prio: "high", due: todayISO(), createdAt: Date.now(), completedAt: null },
+    { id: uid(), text: "回一封搁置了两天的邮件", done: false, prio: "mid", due: shiftISO(1), createdAt: Date.now(), completedAt: null },
+    { id: uid(), text: "出门走 20 分钟，晒晒太阳", done: false, prio: "low", due: "", createdAt: Date.now(), completedAt: null },
+    { id: uid(), text: "喝一杯温水，深呼吸三次", done: true, prio: "low", due: "", createdAt: Date.now() - 5e5, completedAt: Date.now() - 5e4 },
+  ]);
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+  }
+
+  let state = { tasks: [], filter: "all", theme: "light" };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.tasks)) state = { ...state, ...parsed };
+        else state.tasks = seed();
+      } else {
+        state.tasks = seed();
+      }
+    } catch (e) {
+      state.tasks = seed();
+    }
+    if (state.theme !== "dark") state.theme = "light";
+    if (!["all", "active", "done"].includes(state.filter)) state.filter = "all";
+    state.tasks.forEach((t) => {
+      if (!P_LABEL[t.prio]) t.prio = "mid";
+      if (typeof t.done !== "boolean") t.done = false;
+    });
+  }
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ tasks: state.tasks, filter: state.filter, theme: state.theme }));
+    } catch (e) { /* 隐私模式下忽略 */ }
+  }
+
+  /* ---------------- helpers ---------------- */
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function dueInfo(iso) {
+    if (!iso) return null;
+    const today = todayISO();
+    const diff = Math.round((new Date(iso + "T00:00:00") - new Date(today + "T00:00:00")) / 86400000);
+    let label;
+    if (diff === 0) label = "今天";
+    else if (diff === 1) label = "明天";
+    else if (diff === -1) label = "昨天";
+    else {
+      const d = new Date(iso + "T00:00:00");
+      const sameYear = d.getFullYear() === new Date().getFullYear();
+      label = sameYear ? `${d.getMonth() + 1}月${d.getDate()}日` : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    }
+    return { label, diff };
+  }
+
+  const sortTasks = (list) => [
+    ...list.filter((t) => !t.done),
+    ...list.filter((t) => t.done).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)),
+  ];
+
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+
+  /* ---------------- markdown ---------------- */
+  function toMarkdown() {
+    const tasks = state.tasks;
+    const done = tasks.filter((t) => t.done).length;
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    const line = (t) => {
+      const doneMark = t.done ? "[x]" : "[ ]";
+      const bits = [t.text, `**${P_LABEL[t.prio] || "中"}**`];
+      let body = `- ${doneMark} ${bits.join(" · ")}`;
+      if (t.due) body += ` · 截止 ${t.due}`;
+      return body;
+    };
+
+    const active = tasks.filter((t) => !t.done);
+    const completed = [...tasks.filter((t) => t.done)].sort((a, b) => (a.completedAt || 0) - (b.completedAt || 0));
+
+    const parts = [
+      "# 待办清单",
+      "",
+      `> 导出时间：${stamp}　·　完成 ${done}/${tasks.length}${tasks.length ? `（${Math.round((done / tasks.length) * 100)}%）` : ""}`,
+      "",
+    ];
+    if (active.length) {
+      parts.push("## 进行中", "", ...active.map(line), "");
+    }
+    if (completed.length) {
+      parts.push("## 已完成", "", ...completed.map(line), "");
+    }
+    if (!tasks.length) parts.push("_还没有任何待办。_", "");
+    return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  }
+
+  function downloadMd() {
+    const md = toMarkdown();
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `todo-${todayISO()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast("Markdown 已导出 ✦");
+  }
+
+  async function copyMd() {
+    const md = toMarkdown();
+    try {
+      await navigator.clipboard.writeText(md);
+      toast("Markdown 已复制到剪贴板");
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = md;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); toast("Markdown 已复制到剪贴板"); }
+      catch (err) { toast("复制失败，试试导出文件"); }
+      ta.remove();
+    }
+  }
+
+  /* ---------------- render ---------------- */
+  let editingId = null;
+  const seenIds = new Set();
+
+  function render() {
+    const tasks = state.tasks;
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.done).length;
+    const active = total - done;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+
+    $("pct").textContent = pct + "%";
+    const C = 2 * Math.PI * 28;
+    $("ringBar").style.strokeDashoffset = String(C - (C * pct) / 100);
+
+    $("sub").textContent = total
+      ? `${active} 件待办 · ${done} 件已完成 · 一共 ${total} 件`
+      : "写点什么，然后一件件划掉它。";
+
+    const d = new Date();
+    const week = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d.getDay()];
+    $("eyebrow").textContent = `${d.getMonth() + 1}月${d.getDate()}日 · ${week}`;
+
+    document.querySelectorAll("#filters button").forEach((b) => {
+      const f = b.dataset.f;
+      const n = f === "all" ? total : f === "active" ? active : done;
+      b.querySelector("b").textContent = n;
+      b.classList.toggle("on", state.filter === f);
+    });
+
+    const visible = sortTasks(
+      tasks.filter((t) => state.filter === "all" || (state.filter === "active" ? !t.done : t.done))
+    );
+
+    const list = $("list");
+    list.innerHTML = visible.map((t, i) => {
+      const di = dueInfo(t.due);
+      const chips = [];
+      if (t.prio) chips.push(`<span class="chip ${t.prio}"><i></i>${P_LABEL[t.prio]}</span>`);
+      if (di) {
+        const cls = di.diff < 0 && !t.done ? "overdue" : di.diff === 0 ? "today" : "";
+        const label = di.diff < 0 && !t.done ? `逾期 · ${di.label}` : di.label;
+        chips.push(`<span class="chip due ${cls}"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>${esc(label)}</span>`);
+      }
+
+      const body = editingId === t.id
+        ? `<input class="edit-input" id="edit-${t.id}" value="${esc(t.text)}" maxlength="200" aria-label="编辑待办">`
+        : `<span class="text" data-act="edit" title="双击编辑">${esc(t.text)}</span>`;
+
+      const isNew = !seenIds.has(t.id);
+      return `<li class="task${t.done ? " done" : ""}${isNew ? " anim" : ""}" data-id="${t.id}" draggable="${state.filter === "all" ? "true" : "false"}"${isNew ? ` style="animation-delay:${Math.min(i, 8) * 45}ms"` : ""}>
+        <button class="check" data-act="toggle" aria-pressed="${t.done}" aria-label="${t.done ? "标记为未完成" : "标记为完成"}">
+          <svg viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>
+        </button>
+        <div class="body">${body}<div class="meta">${chips.join("")}</div></div>
+        <div class="actions">
+          <button class="icon" data-act="edit" title="编辑" aria-label="编辑"><svg viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M14.5 5.5 18 9"/></svg></button>
+          <button class="icon del" data-act="del" title="删除" aria-label="删除"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.8A1.8 1.8 0 0 1 11.3 3h1.4a1.8 1.8 0 0 1 1.8 1.8V7"/><path d="M6.5 7l.9 12.2a2 2 0 0 0 2 1.8h5.2a2 2 0 0 0 2-1.8L17.5 7"/></svg></button>
+        </div>
+      </li>`;
+    }).join("");
+
+    visible.forEach((t) => seenIds.add(t.id));
+
+    const empty = $("empty");
+    empty.classList.toggle("show", visible.length === 0);
+    $("list").style.display = visible.length ? "" : "none";
+    if (visible.length === 0) {
+      if (state.filter === "done" && done === 0) {
+        $("emptyTitle").textContent = "还没有完成的事";
+        $("emptyText").textContent = "做完一件，就在这里划掉它。";
+      } else if (state.filter === "active" && active === 0) {
+        $("emptyTitle").textContent = "全部完成 ✦";
+        $("emptyText").textContent = "清空了，去歇一会儿吧。";
+      } else {
+        $("emptyTitle").textContent = "还空着";
+        $("emptyText").textContent = "在上面输入一件事，按下 Enter 就行。";
+      }
+    }
+
+    $("footerCount").innerHTML = total
+      ? `还剩 <b>${active}</b> 件 · 完成 <b>${done}</b> / ${total}`
+      : "还没有待办";
+
+    if (editingId) {
+      const input = $("edit-" + editingId);
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+  }
+
+  /* ---------------- actions ---------------- */
+  function addTask(text, prio, due) {
+    state.tasks.push({
+      id: uid(), text, done: false, prio, due: due || "",
+      createdAt: Date.now(), completedAt: null,
+    });
+    save();
+    render();
+  }
+
+  function toggleTask(id) {
+    const t = state.tasks.find((x) => x.id === id);
+    if (!t) return;
+    t.done = !t.done;
+    t.completedAt = t.done ? Date.now() : null;
+    save();
+    render();
+
+    const active = state.tasks.filter((x) => !x.done).length;
+    if (t.done && active === 0 && state.tasks.length > 0) toast("全部完成，漂亮 ✦");
+  }
+
+  function removeTask(id) {
+    const li = document.querySelector(`.task[data-id="${id}"]`);
+    if (li) li.classList.add("removing");
+    setTimeout(() => {
+      state.tasks = state.tasks.filter((x) => x.id !== id);
+      save();
+      render();
+    }, 190);
+  }
+
+  function startEdit(id) {
+    editingId = id;
+    render();
+  }
+
+  function commitEdit(id, value) {
+    const v = value.trim();
+    if (v) {
+      const t = state.tasks.find((x) => x.id === id);
+      if (t) t.text = v;
+    }
+    editingId = null;
+    save();
+    render();
+  }
+
+  /* ---------------- events ---------------- */
+  // add
+  let activePrio = "mid";
+  const composer = $("composer");
+  const input = $("newTask");
+
+  $("prio").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-p]");
+    if (!btn) return;
+    activePrio = btn.dataset.p;
+    [...$("prio").children].forEach((b) => b.classList.toggle("on", b === btn));
+  });
+
+  composer.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      composer.classList.add("open");
+      return;
+    }
+    addTask(text, activePrio, $("dueInput").value);
+    input.value = "";
+    dueInput.value = "";
+    dateWrap.classList.remove("filled");
+    input.focus();
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); composer.requestSubmit(); }
+    if (e.key === "Escape") { input.value = ""; input.blur(); }
+  });
+
+  $("dueInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); composer.requestSubmit(); }
+  });
+
+  const dueInput = $("dueInput");
+  const dateWrap = $("dateWrap");
+  const syncDue = () => dateWrap.classList.toggle("filled", !!dueInput.value);
+  dueInput.addEventListener("input", syncDue);
+  dueInput.addEventListener("change", syncDue);
+  dateWrap.addEventListener("click", (e) => {
+    if (e.target !== dueInput) {
+      try { dueInput.showPicker(); } catch (err) { dueInput.focus(); }
+    }
+  });
+
+  // list interactions
+  $("list").addEventListener("click", (e) => {
+    const li = e.target.closest(".task");
+    if (!li) return;
+    const id = li.dataset.id;
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    if (act === "toggle") toggleTask(id);
+    else if (act === "del") removeTask(id);
+    else if (act === "edit") startEdit(id);
+  });
+
+  $("list").addEventListener("dblclick", (e) => {
+    const li = e.target.closest(".task");
+    if (!li) return;
+    if (e.target.closest(".text")) { e.preventDefault(); startEdit(li.dataset.id); }
+  });
+
+  $("list").addEventListener("keydown", (e) => {
+    const edit = e.target.closest(".edit-input");
+    if (!edit) return;
+    const id = edit.id.replace("edit-", "");
+    if (e.key === "Enter") { e.preventDefault(); commitEdit(id, edit.value); }
+    if (e.key === "Escape") { editingId = null; render(); }
+  });
+
+  $("list").addEventListener("focusout", (e) => {
+    const edit = e.target.closest(".edit-input");
+    if (!edit) return;
+    // 点击别处时保存
+    const id = edit.id.replace("edit-", "");
+    setTimeout(() => {
+      if (editingId === id) commitEdit(id, edit.value);
+    }, 0);
+  });
+
+  // drag & drop
+  let dragId = null;
+  $("list").addEventListener("dragstart", (e) => {
+    const li = e.target.closest(".task");
+    if (!li || state.filter !== "all") return;
+    dragId = li.dataset.id;
+    li.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", dragId); } catch (err) {}
+  });
+  $("list").addEventListener("dragend", () => {
+    dragId = null;
+    document.querySelectorAll(".task").forEach((el) => el.classList.remove("dragging", "drop-before"));
+  });
+  $("list").addEventListener("dragover", (e) => {
+    if (!dragId) return;
+    const li = e.target.closest(".task");
+    document.querySelectorAll(".task").forEach((el) => el.classList.remove("drop-before"));
+    if (li && li.dataset.id !== dragId) {
+      e.preventDefault();
+      li.classList.add("drop-before");
+    }
+  });
+  $("list").addEventListener("drop", (e) => {
+    if (!dragId) return;
+    e.preventDefault();
+    const li = e.target.closest(".task");
+    const targetId = li ? li.dataset.id : null;
+    const from = state.tasks.findIndex((t) => t.id === dragId);
+    if (from < 0) return;
+    const [moved] = state.tasks.splice(from, 1);
+    const to = targetId ? state.tasks.findIndex((t) => t.id === targetId) : state.tasks.length;
+    state.tasks.splice(to < 0 ? state.tasks.length : to, 0, moved);
+    dragId = null;
+    save();
+    render();
+  });
+
+  // filters
+  $("filters").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-f]");
+    if (!btn) return;
+    state.filter = btn.dataset.f;
+    save();
+    render();
+  });
+
+  $("clearBtn").addEventListener("click", () => {
+    const n = state.tasks.filter((t) => t.done).length;
+    if (!n) return toast("还没有已完成的事");
+    state.tasks = state.tasks.filter((t) => !t.done);
+    save();
+    render();
+    toast(`已清除 ${n} 件`);
+  });
+
+  $("exportBtn").addEventListener("click", downloadMd);
+  $("copyBtn").addEventListener("click", copyMd);
+
+  // theme
+  const SUN = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>';
+  const MOON = '<svg viewBox="0 0 24 24"><path d="M20 14.5A8.2 8.2 0 0 1 9.5 4 8.4 8.4 0 1 0 20 14.5Z"/></svg>';
+
+  function applyTheme() {
+    document.documentElement.dataset.theme = state.theme;
+    $("themeBtn").innerHTML = state.theme === "dark" ? SUN : MOON;
+  }
+  $("themeBtn").addEventListener("click", () => {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    applyTheme();
+    save();
+  });
+
+  // global shortcuts
+  document.addEventListener("keydown", (e) => {
+    const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+    if (e.key === "/" && !typing) {
+      e.preventDefault();
+      input.focus();
+      composer.classList.add("open");
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !typing) {
+      e.preventDefault();
+      composer.requestSubmit();
+    }
+  });
+
+  /* ---------------- boot ---------------- */
+  load();
+  const qTheme = new URLSearchParams(location.search).get("theme");
+  if (qTheme === "dark" || qTheme === "light") state.theme = qTheme;
+  applyTheme();
+  render();
+
+  // 调试/脚本化出口，例如在控制台里 __todo.markdown()
+  window.__todo = { markdown: toMarkdown, state };
+})();
+</script>
+</body>
+</html>

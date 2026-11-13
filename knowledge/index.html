@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>条目</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --surface-2: #eef1f7;
+    --ink: #1b2333;
+    --ink-soft: #44506a;
+    --muted: #8a93a8;
+    --line: #e3e8f1;
+    --accent: #4f6ef7;
+    --accent-deep: #3a55d6;
+    --accent-wash: #e9eeff;
+    --ok: #3f9d6c;
+    --warn: #b9832f;
+    --danger: #c74b4b;
+    --radius: 16px;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #12151d;
+    --surface: #1a1f2b;
+    --surface-2: #222839;
+    --ink: #eef1f8;
+    --ink-soft: #c3cadd;
+    --muted: #7d869c;
+    --line: #2c3345;
+    --accent: #7b96ff;
+    --accent-deep: #a3b6ff;
+    --accent-wash: #232b47;
+    --ok: #7cc29b;
+    --warn: #d9a45e;
+    --danger: #e07c7c;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background .35s ease, color .35s ease;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .brand h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+  .brand .count { font-size: 11px; color: var(--muted); }
+  .toolbar { display: flex; gap: 8px; align-items: center; }
+  .search { flex: 1; position: relative; }
+  .search input {
+    width: 100%; font: inherit; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 7px 10px 7px 28px; outline: none;
+  }
+  .search input:focus { border-color: var(--accent); }
+  .search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); opacity: .5; }
+  .btn {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 10px; padding: 7px 11px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--line); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-deep); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+  .chip {
+    font: inherit; font-size: 12px; cursor: pointer; padding: 4px 11px; border-radius: 999px;
+    background: transparent; color: var(--ink-soft); border: 1px solid var(--line);
+  }
+  .chip.on { background: var(--accent-wash); color: var(--accent-deep); border-color: var(--accent); }
+  main { flex: 1; display: flex; min-height: 0; }
+  .list { width: 38%; min-width: 220px; border-right: 1px solid var(--line); overflow-y: auto; background: var(--surface); }
+  .list-item { padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .list-item:hover { background: var(--surface-2); }
+  .list-item.on { background: var(--accent-wash); }
+  .list-item .t { font-weight: 650; font-size: 13.5px; line-height: 1.35; }
+  .list-item .meta { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .list-item .sum { font-size: 12px; color: var(--ink-soft); margin-top: 5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .badge { font-size: 10.5px; color: var(--accent-deep); background: var(--accent-wash); padding: 1px 7px; border-radius: 6px; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+  .detail { flex: 1; overflow-y: auto; padding: 22px 26px 60px; min-width: 0; }
+  .detail h2 { margin: 0 0 4px; font-size: 21px; line-height: 1.3; }
+  .detail .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .detail .tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
+  .detail .tags span { font-size: 11px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); padding: 2px 8px; border-radius: 6px; }
+  .detail .summary { font-size: 14px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 16px; }
+  .block { margin-bottom: 18px; }
+  .block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .block ul { margin: 0; padding-left: 0; list-style: none; }
+  .block li { position: relative; padding: 7px 0 7px 20px; font-size: 13.5px; line-height: 1.6; border-bottom: 1px dashed var(--line); }
+  .block li:last-child { border-bottom: 0; }
+  .block li::before { content: ''; position: absolute; left: 2px; top: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: .75; }
+  .block.axioms li::before { background: var(--warn); }
+  .block.elements li::before { background: var(--ok); }
+  .block.conclusions li::before { background: var(--accent); }
+  .perspectives li { padding-left: 0; }
+  .perspectives li::before { display: none; }
+  .perspective { font-size: 13px; line-height: 1.6; }
+  .perspective .who { display: inline-block; font-size: 10px; color: var(--accent-deep); background: var(--accent-wash); border-radius: 5px; padding: 0 5px; margin-right: 6px; }
+  .perspective .who.user { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+  .related a { color: var(--accent-deep); cursor: pointer; text-decoration: none; }
+  .related a:hover { text-decoration: underline; }
+  .actions { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabbar { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 14px; }
+  .tab { font: inherit; font-size: 12.5px; cursor: pointer; padding: 8px 12px; background: transparent; color: var(--muted); border: none; border-bottom: 2px solid transparent; }
+  .tab.on { color: var(--accent-deep); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabbody { padding-top: 14px; }
+  .persp-add { display: flex; gap: 8px; margin-top: 8px; }
+  .persp-add input { flex: 1; font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; outline: none; }
+  .persp-add input:focus { border-color: var(--accent); }
+  .editor label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; }
+  .editor input, .editor textarea, .editor select {
+    width: 100%; font: inherit; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; outline: none; resize: vertical;
+  }
+  .editor input:focus, .editor textarea:focus, .editor select:focus { border-color: var(--accent); }
+  .editor textarea { min-height: 68px; line-height: 1.55; }
+  .editor textarea.tall { min-height: 110px; }
+  .editor .row { display: flex; gap: 10px; }
+  .editor .row > div { flex: 1; }
+  .editor .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  #sync-status { font-size: 11.5px; color: var(--muted); padding: 6px 16px; min-height: 20px; border-top: 1px solid var(--line); background: var(--surface); }
+  @media (max-width: 640px) {
+    main { flex-direction: column; }
+    .list { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); max-height: 45%; }
+    .detail { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>条目</h1><span class="count" id="count"></span>
+  </div>
+  <div class="toolbar">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input id="searchInput" type="search" placeholder="搜索标题 / 概述 / 公理 / 结论…" aria-label="搜索条目">
+    </div>
+    <button class="btn" id="exportBtn" type="button" title="导出为 Markdown">导出</button>
+    <button class="btn primary" id="newBtn" type="button">＋ 新建</button>
+  </div>
+</header>
+<div class="chips" id="chips" role="tablist" aria-label="领域筛选"></div>
+<main>
+  <div class="list" id="list"></div>
+  <div class="detail" id="detail"><div class="empty">从左侧选择一条条目，或点击「＋ 新建」记录你的第一个 idea</div></div>
+</main>
+<div id="sync-status" role="status"></div>
+
+<script>
+  const state = {
+    entries: [], revision: null, query: '', domain: '', selectedId: null,
+    editing: false, isNew: false, theme: 'light', themeFollow: true,
+    draft: null, detailTab: 'organized'
+  };
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtDate = t => { try { return new Date(t).toISOString().slice(0, 10); } catch { return ''; } };
+  const splitLines = s => String(s ?? '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+
+  function applyTheme() {
+    state.theme = state.themeFollow ? (detectHarnessDark() ? 'dark' : 'light') : state.theme;
+    document.documentElement.setAttribute('data-theme', state.theme);
+  }
+  function detectHarnessDark() {
+    try {
+      if (window.parent && window.parent !== window && window.parent.document && window.parent.document.body) {
+        return window.parent.document.body.hasAttribute('data-ds-dark-theme');
+      }
+    } catch {}
+    return false;
+  }
+
+  function domains() {
+    const counts = new Map();
+    for (const e of state.entries) { const d = e.domain || '未分类'; counts.set(d, (counts.get(d) || 0) + 1); }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }
+  function filtered() {
+    let es = state.entries;
+    if (state.domain) es = es.filter(e => e.domain === state.domain);
+    if (state.query) {
+      const q = state.query.toLowerCase();
+      es = es.filter(e => [e.title, e.domain, e.summary, ...(e.tags||[]), ...(e.axioms||[]), ...(e.elements||[]), ...(e.conclusions||[]), ...(e.perspectives||[]).map(p=>p.text)].join('\n').toLowerCase().includes(q));
+    }
+    return es;
+  }
+  function selected() { return state.entries.find(e => e.id === state.selectedId) || null; }
+
+  function render() {
+    $('count').textContent = state.entries.length ? `${state.entries.length} 条` : '';
+    // chips
+    const chipEl = $('chips');
+    const ds = domains();
+    const chip = (label, value, on) => { const b = document.createElement('button'); b.className = 'chip' + (on ? ' on' : ''); b.type = 'button'; b.textContent = label; b.onclick = () => { state.domain = value; state.selectedId = null; state.editing = false; render(); }; return b; };
+    chipEl.replaceChildren(chip('全部', '', state.domain === ''), ...ds.map(([d, n]) => chip(`${d} ${n}`, d, state.domain === d)));
+    // list
+    const listEl = $('list');
+    const es = filtered();
+    if (!es.length) { listEl.innerHTML = `<div class="empty">${state.entries.length ? '没有匹配的条目' : '还没有条目，从聊天解析或点「＋ 新建」开始吧'}</div>`; }
+    else {
+      listEl.innerHTML = '';
+      for (const e of es) {
+        const div = document.createElement('div');
+        div.className = 'list-item' + (e.id === state.selectedId ? ' on' : '');
+        div.innerHTML = `<div class="t">${esc(e.title)}</div>
+          <div class="meta">${e.domain ? `<span class="badge">${esc(e.domain)}</span>` : ''}${e.tags.length ? `<span>${esc(e.tags.slice(0,3).join(' · '))}</span>` : ''}<span>${fmtDate(e.updatedAt)}</span></div>
+          ${e.summary ? `<div class="sum">${esc(e.summary)}</div>` : ''}`;
+        div.onclick = () => { state.selectedId = e.id; state.editing = false; render(); };
+        listEl.appendChild(div);
+      }
+    }
+    renderDetail();
+  }
+  function renderDetail() {
+    const el = $('detail');
+    if (state.editing) { renderEditor(el); return; }
+    const e = selected();
+    if (!e) { el.innerHTML = `<div class="empty">从左侧选择一条条目，或点击「＋ 新建」记录你的第一个 idea</div>`; return; }
+    const tab = state.detailTab || 'organized';
+    const perspCount = (e.perspectives || []).length;
+    const related = (e.related || []).map(t => {
+      const target = state.entries.find(x => x.title === t);
+      return target ? `<a data-id="${esc(target.id)}">${esc(t)}</a>` : esc(t);
+    }).join('、');
+    const organizedHTML = `
+      ${e.summary ? `<p class="summary">${esc(e.summary)}</p>` : ''}
+      ${e.axioms.length ? `<div class="block axioms"><h3>前提 / 公理</h3><ul>${e.axioms.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+      ${e.elements.length ? `<div class="block elements"><h3>基本事实 / 要素</h3><ul>${e.elements.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+      ${e.conclusions.length ? `<div class="block conclusions"><h3>推导结论</h3><ul>${e.conclusions.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+      ${e.related.length ? `<div class="block"><h3>关联</h3><div class="related">${related}</div></div>` : ''}
+    `;
+    const recordsHTML = `
+      ${perspCount ? `<div class="block perspectives"><ul>${(e.perspectives || []).map(p => `<li><div class="perspective"><span class="who ${p.source}">${p.source === 'user' ? '用户' : 'AI'}</span>${esc(p.text)}</div></li>`).join('')}</ul></div>` : `<div class="empty">还没有角度记录。聊到新情况或新进展时，AI 会把角度追加到这里。</div>`}
+      <div class="persp-add"><input id="perspInput" placeholder="新增一个角度或诠释，Enter 追加…" aria-label="新增角度"><button class="btn" id="perspBtn" type="button">追加</button></div>
+    `;
+    el.innerHTML = `
+      <div class="actions">
+        <button class="btn" id="editBtn" type="button">编辑</button>
+        <button class="btn" id="outputBtn" type="button">输出</button>
+        <button class="btn" id="deleteBtn" type="button">删除</button>
+      </div>
+      <h2>${esc(e.title)}</h2>
+      <div class="sub">${e.domain ? `<span class="badge">${esc(e.domain)}</span>` : ''}<span>更新于 ${fmtDate(e.updatedAt)}</span></div>
+      ${e.tags.length ? `<div class="tags">${e.tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="tabbar">
+        <button class="tab${tab === 'organized' ? ' on' : ''}" type="button" data-tab="organized">整理后</button>
+        <button class="tab${tab === 'records' ? ' on' : ''}" type="button" data-tab="records">角度记录${perspCount ? ` (${perspCount})` : ''}</button>
+      </div>
+      <div class="tabbody">${tab === 'organized' ? organizedHTML : recordsHTML}</div>
+    `;
+    $('editBtn').onclick = openEdit;
+    $('outputBtn').onclick = outputSelected;
+    $('deleteBtn').onclick = deleteSelected;
+    el.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.detailTab = b.dataset.tab; render(); });
+    const perspBtn = $('perspBtn'), perspInput = $('perspInput');
+    if (perspBtn && perspInput) {
+      perspBtn.onclick = submitPerspective;
+      perspInput.addEventListener('keydown', ev => { if (ev.key === 'Enter') submitPerspective(); });
+    }
+    el.querySelectorAll('.related a').forEach(a => a.onclick = () => { state.selectedId = a.dataset.id; render(); });
+  }
+  function renderEditor(el) {
+    const e = state.isNew ? null : selected();
+    const d = state.draft || (e ? { type: e.type, title: e.title, domain: e.domain, tags: e.tags, summary: e.summary, axioms: e.axioms, elements: e.elements, conclusions: e.conclusions, related: e.related } : { type: 'knowledge', title: '', domain: '', tags: [], summary: '', axioms: [], elements: [], conclusions: [], related: [] });
+    state.draft = d;
+    el.innerHTML = `
+      <div class="actions">
+        <button class="btn primary" id="saveBtn" type="button">保存</button>
+        <button class="btn" id="cancelBtn" type="button">取消</button>
+      </div>
+      <div class="editor">
+        <label for="fType">类型</label>
+        <select id="fType">
+          <option value="knowledge"${d.type !== 'plan' ? ' selected' : ''}>知识（理解某事物）</option>
+          <option value="plan"${d.type === 'plan' ? ' selected' : ''}>计划 / 目标（达成某件事）</option>
+        </select>
+        <label for="fTitle">标题</label><input id="fTitle" maxlength="200" placeholder="这个 idea / 事物叫什么" value="${esc(d.title)}">
+        <div class="row">
+          <div><label for="fDomain">领域</label><input id="fDomain" maxlength="50" list="domainList" placeholder="物理 / 商业 / AI / 认知…" value="${esc(d.domain)}">
+            <datalist id="domainList">${domains().map(([x]) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+          <div><label for="fTags">标签（逗号分隔）</label><input id="fTags" maxlength="200" value="${esc((d.tags||[]).join(', '))}"></div>
+        </div>
+        <label for="fSummary">一句话概述</label><input id="fSummary" maxlength="500" value="${esc(d.summary)}">
+        <label for="fAxioms">前提 / 公理（每行一条）</label><textarea id="fAxioms" class="tall">${esc((d.axioms||[]).join('\n'))}</textarea>
+        <label for="fElements">基本事实 / 要素（每行一条）</label><textarea id="fElements" class="tall">${esc((d.elements||[]).join('\n'))}</textarea>
+        <label for="fConclusions">推导结论（每行一条）</label><textarea id="fConclusions" class="tall">${esc((d.conclusions||[]).join('\n'))}</textarea>
+        <label for="fRelated">关联条目标题（每行一条）</label><textarea id="fRelated">${esc((d.related||[]).join('\n'))}</textarea>
+        <div class="hint">角度/诠释在详情页追加，不在此编辑。</div>
+      </div>
+    `;
+    $('saveBtn').onclick = saveDraft;
+    $('cancelBtn').onclick = cancelEdit;
+  }
+
+  function openNew() { state.isNew = true; state.editing = true; state.selectedId = null; state.draft = null; render(); }
+  function openEdit() { state.isNew = false; state.editing = true; state.draft = null; render(); }
+  function cancelEdit() { state.editing = false; state.draft = null; render(); }
+  function collectDraft() {
+    return {
+      type: $('fType').value,
+      title: $('fTitle').value.trim(),
+      domain: $('fDomain').value.trim(),
+      tags: splitLines($('fTags').value.replace(/[，,]/g, '\n')),
+      summary: $('fSummary').value.trim(),
+      axioms: splitLines($('fAxioms').value),
+      elements: splitLines($('fElements').value),
+      conclusions: splitLines($('fConclusions').value),
+      related: splitLines($('fRelated').value)
+    };
+  }
+  async function saveDraft() {
+    const d = collectDraft();
+    if (!d.title) { syncStatus('标题不能为空', true); return; }
+    state.draft = d;
+    const r = state.isNew ? await mutate('add', d) : await mutate('update', { id: state.selectedId, patch: d });
+    if (r) {
+      state.editing = false; state.draft = null;
+      if (state.isNew) state.selectedId = r.result?.entry?.id ?? null;
+      acceptSnapshot(r.snapshot);
+    }
+  }
+  function submitPerspective() {
+    const input = $('perspInput'); const text = input.value.trim();
+    if (!text || !state.selectedId) return;
+    input.value = '';
+    mutate('addPerspective', { id: state.selectedId, text, source: 'user' }).then(r => { if (r) acceptSnapshot(r.snapshot); });
+  }
+  function deleteSelected() {
+    const e = selected(); if (!e) return;
+    if (!window.confirm(`删除条目「${e.title}」？此操作不可撤销。`)) return;
+    mutate('remove', { ids: [e.id] }).then(r => { if (r) { state.selectedId = null; acceptSnapshot(r.snapshot); } });
+  }
+  async function outputSelected() {
+    const e = selected(); if (!e) return;
+    try {
+      const r = await hostRequest({ op: 'output', id: e.id });
+      const md = r.markdown;
+      try { await navigator.clipboard.writeText(md); syncStatus('已复制条目 Markdown 到剪贴板'); }
+      catch {
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${e.title}.md`; a.click(); URL.revokeObjectURL(a.href);
+        syncStatus(`已下载 ${e.title}.md`);
+      }
+    } catch (err) { syncStatus(`输出失败：${err.message}`, true); }
+  }
+  function toMarkdown() {
+    const lines = [`# 条目库（${state.entries.length} 条）`, ''];
+    for (const e of state.entries) {
+      lines.push(`## ${e.title}`);
+      if (e.domain) lines.push(`- 领域：${e.domain}`);
+      if (e.tags.length) lines.push(`- 标签：${e.tags.join('、')}`);
+      if (e.summary) lines.push(`- 概述：${e.summary}`);
+      if (e.axioms.length) { lines.push('', '### 前提 / 公理'); e.axioms.forEach(t => lines.push(`- ${t}`)); }
+      if (e.elements.length) { lines.push('', '### 基本事实 / 要素'); e.elements.forEach(t => lines.push(`- ${t}`)); }
+      if (e.conclusions.length) { lines.push('', '### 推导结论'); e.conclusions.forEach(t => lines.push(`- ${t}`)); }
+      if (e.perspectives.length) { lines.push('', '### 角度 / 诠释'); e.perspectives.forEach(p => lines.push(`- [${p.source === 'user' ? '用户' : 'AI'}] ${p.text}`)); }
+      if (e.related.length) lines.push('', `- 关联：${e.related.join('、')}`);
+      lines.push('', `> 更新于 ${fmtDate(e.updatedAt)}`, '');
+    }
+    return lines.join('\n');
+  }
+  async function doExport() {
+    const md = toMarkdown();
+    try { await navigator.clipboard.writeText(md); syncStatus('已复制 Markdown 到剪贴板，可粘贴到夸克网盘或任意笔记'); }
+    catch {
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'knowledge.md'; a.click(); URL.revokeObjectURL(a.href);
+      syncStatus('已下载 knowledge.md');
+    }
+  }
+
+  function acceptSnapshot(snapshot) {
+    if (!snapshot || !Number.isSafeInteger(snapshot.revision) || !Array.isArray(snapshot.entries)) { syncStatus('服务返回无效数据', true); return; }
+    if (state.editing) { deferredSnapshot = snapshot; return; }
+    state.revision = snapshot.revision;
+    state.entries = snapshot.entries;
+    // keep selection if still present
+    if (state.selectedId && !state.entries.some(e => e.id === state.selectedId)) state.selectedId = null;
+    deferredSnapshot = null;
+    render();
+  }
+  function finishDeferred() { if (deferredSnapshot && !state.editing) acceptSnapshot(deferredSnapshot); }
+
+  $('searchInput').addEventListener('input', ev => { state.query = ev.target.value.trim(); render(); });
+  $('newBtn').addEventListener('click', openNew);
+  $('exportBtn').addEventListener('click', doExport);
+
+  /* ---------------- boot ---------------- */
+</script>
+</body>
+</html>

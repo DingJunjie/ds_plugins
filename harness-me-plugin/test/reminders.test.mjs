@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import vm from 'node:vm';
+import { MeStore } from '../lib/store.js';
+const source=await readFile(new URL('../floating-widget.js',import.meta.url),'utf8');
+const context={};vm.runInNewContext(source,context);
+test('water at one hour, movement at two hours, red overrides blue',()=>{
+ const baseline=Date.parse('2026-11-11T01:00:00Z');
+ assert.equal(context.meHydrationDue(true,null,baseline,baseline+3599999),false);
+ assert.equal(context.meHydrationDue(true,null,baseline,baseline+3600000),true);
+ assert.equal(context.meMovementDue(true,null,baseline,baseline+7199999),false);
+ assert.equal(context.meMovementDue(true,null,baseline,baseline+7200000),true);
+ assert.match(context.meReminderStyle(true,false).border,/#174a8b/);
+ assert.match(context.meReminderStyle(true,false).boxShadow,/#174a8b/);
+ assert.match(context.meReminderStyle(true,true).border,/#c7333f/);
+ assert.equal(context.meMovementDue(false,null,baseline,baseline+9999999),false);
+ assert.equal(context.meMovementDue(true,new Date(baseline+7100000).toISOString(),baseline,baseline+7200000),false);
+});
+test('walk logs reset movement but do not invent duration or drinking',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'me-movement-test-'));
+ const store=new MeStore({filePath:path.join(dir,'me.json')});
+ const saved=await store.add({content:'起身走动了一次',category:'走动',activity:'exercise',occurredAt:new Date(Date.now()-1000).toISOString()});
+ const stats=await store.stats({days:1});
+ assert.equal(stats.lastMovementAt,saved.record.occurredAt);
+ assert.equal(stats.lastWaterAt,null);
+ assert.equal(stats.days.at(-1).exerciseMin,null);
+});

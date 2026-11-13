@@ -1,0 +1,26 @@
+{
+  "name": "harness-knowledge-local",
+  "version": "0.1.1",
+  "description": "知识点百科：用第一性原理拆解并沉淀 idea，支持聊天一键解析存档、持续讨论追加角度、本地 JSON 存储与 Markdown 导出",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "cordis.patch.yml", "README.md"],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-subagent": "0.2.2-rc.2"
+  },
+  "engines": { "dsh": "0.2.2-rc.2" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-connection"]
+    }
+  }
+}
