@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>蔡加尼克效应 | 60s Animation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#05070b}
+canvas{display:block}
+.overlay{position:fixed;top:12px;left:12px;color:#fff8;font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans SC;z-index:10;font-size:13px}
+</style>
+</head>
+<body>
+<div class="overlay" id="info"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const CAPTURE = new URLSearchParams(location.search).has('capture');
+const CAP_T = parseFloat(new URLSearchParams(location.search).get('t')||0);
+const W = 1920, H = 1080;
+const TOTAL_DUR = 60;
+const SEED = 1227;
+let rng = (()=>{
+    let s = SEED;
+    return ()=>{
+        s = (s*1103515245 + 12345) & 0x7fffffff;
+        return s/0x7fffffff;
+    }
+})();
+const PI = Math.PI;
+const TAU = PI*2;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const remap=(v,in0,in1,out0,out1)=>out0+(out1-out0)*((v-in0)/(in1-in0));
+const easeOutBack=(t)=>{
+    const c1=1.70158;
+    const c3=c1+1;
+    return 1 + c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);
+};
+const springStep=(t,amp=1,omega=4,zeta=0.4)=>{
+    if(t<=0) return 0;
+    if(zeta>=1) return 1-Math.exp(-omega*t)*(1+omega*t);
+    const omegad = omega*Math.sqrt(1-zeta*zeta);
+    const e = Math.exp(-zeta*omega*t);
+    return 1 - e*(Math.cos(omegad*t)+(zeta*omega/omegad)*Math.sin(omegad*t));
+};
+function curl(x,y,z){
+    const s=0.6;
+    const nx=Math.sin(y*s)-Math.cos(z*s);
+    const ny=Math.sin(z*s)-Math.cos(x*s);
+    const nz=Math.sin(x*s)-Math.cos(y*s);
+    return [nx*0.25,ny*0.25,nz*0.25];
+}
+const COL_AMBER = new THREE.Color(0xffb055);
+const COL_CYAN = new THREE.Color(0x44e0dd);
+const COL_BG = new THREE.Color(0x141b2b);
+const COL_WHITE = new THREE.Color(0xffffff);
+
+const COUNT_MAIN = 8500;
+const COUNT_DEBRIS = 2200;
+const COUNT_NEURON = 3200;
+const COUNT_BOKEH = 220;
+const TRAIL_STEPS = 8;
+const MAIN_RADIUS = 3.2;
+
+function makeBuffer(n){
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n*3);
+    const col = new Float32Array(n*3);
+    const siz = new Float32Array(n);
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+    geo.setAttribute('size',new THREE.BufferAttribute(siz,1));
+    return {geo,pos,col,siz};
+}
+const bufMain = makeBuffer(COUNT_MAIN * (TRAIL_STEPS+1));
+const bufDebris = makeBuffer(COUNT_DEBRIS);
+const bufNeuron = makeBuffer(COUNT_NEURON);
+const bufBokeh = makeBuffer(COUNT_BOKEH);
+
+const matPoint = new THREE.PointsMaterial({
+    size:0.16,
+    transparent:true,
+    blending:THREE.AdditiveBlending,
+    depthWrite:false,
+    vertexColors:true
+});
+const matBokeh = matPoint.clone();
+matBokeh.size = 1.4;
+
+const ptsMain = new THREE.Points(bufMain.geo, matPoint);
+const ptsDebris = new THREE.Points(bufDebris.geo, matPoint);
+const ptsNeuron = new THREE.Points(bufNeuron.geo, matPoint);
+const ptsBokeh = new THREE.Points(bufBokeh.geo, matBokeh);
+
+const scene = new THREE.Scene();
+scene.add(ptsMain, ptsDebris, ptsNeuron, ptsBokeh);
+const camera = new THREE.PerspectiveCamera(45, W/H, 0.01, 200);
+const renderer = new THREE.WebGLRenderer({preserveDrawingBuffer:true, antialias:true});
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+document.body.appendChild(renderer.domElement);
+
+function circleParam(angle, gapRad=0.45){
+    if(angle > TAU - gapRad){
+        return null;
+    }
+    const x = MAIN_RADIUS * Math.cos(angle);
+    const y = MAIN_RADIUS * Math.sin(angle);
+    return [x,y,0];
+}
+function springOsc(t){
+    return Math.exp(-t*2.2)*Math.sin(t*7.5);
+}
+function getCamPos(t){
+    let x=0,y=0,z=9;
+    if(t<4){
+        const k = springStep(t,1,2.5,0.45);
+        z = 9 - k*4.2;
+        y = springOsc(t)*0.12;
+    }else if(t<18){
+        const kt = remap(t,4,18,0,1);
+        const k = easeOutBack(kt);
+        z = 4.8 + k*5.5;
+        y = springOsc((t-4)*0.6)*0.1;
+    }else if(t<40){
+        const kt = remap(t,18,40,0,1);
+        z = remap(kt,0,1,10,6.2);
+    }else if(t<52){
+        const kt = remap(t,40,52,0,1);
+        z = remap(kt,0,1,6.2,7.2);
+    }else{
+        const kt = remap(t,52,60,0,1);
+        z = remap(kt,0,1,7.2,-12);
+    }
+    return new THREE.Vector3(x,y,z);
+}
+function getCamLook(t){
+    if(t<18) return new THREE.Vector3(0,0,0);
+    else if(t<40) return new THREE.Vector3(0, -0.4, 0);
+    else return new THREE.Vector3(0,0,0);
+}
+function timeWarp(t){
+    if(t>=48 && t<=51){
+        const sub = remap(t,48,51,0,1);
+        const slow = 0.32 + 0.68*Math.sin(sub*PI);
+        return (t-48)*slow + 48;
+    }
+    return t;
+}
+function renderAt(rawT){
+    const t = timeWarp(rawT);
+    const infoDom = document.getElementById('info');
+    if(!CAPTURE) infoDom.innerText = `t = ${t.toFixed(2)}s / ${TOTAL_DUR}s`;
+    const rngSave = rng;
+    rng = (()=>{
+        let s = SEED;
+        return ()=>{
+            s = (s*1103515245 + 12345) & 0x7fffffff;
+            return s/0x7fffffff;
+        }
+    })();
+    const posMain = bufMain.pos;
+    const colMain = bufMain.col;
+    const sizMain = bufMain.siz;
+    posMain.fill(0); colMain.fill(0); sizMain.fill(0);
+    for(let i=0;i<COUNT_MAIN;i++){
+        const stagger = (i/COUNT_MAIN)*0.8;
+        const ti = t - stagger;
+        let ang = 0;
+        let col = COL_AMBER.clone();
+        let size = 0.22;
+        let px=0,py=0,pz=0;
+        if(ti<4){
+            const prog = springStep(ti,1,3,0.4);
+            ang = prog * (TAU - 0.45);
+            const p = circleParam(ang);
+            if(p){
+                [px,py,pz] = p;
+            }
+            const osc = springOsc(ti);
+            py += osc*0.08;
+        }else if(ti<18){
+            const loopSpd = 0.38;
+            ang = ((ti-4)*loopSpd) % (TAU - 0.45);
+            const p = circleParam(ang);
+            if(p){
+                [px,py,pz] = p;
+            }else{
+                const osc = springOsc((ti-4)*1.3);
+                px = MAIN_RADIUS*Math.cos(TAU - 0.45);
+                py = MAIN_RADIUS*Math.sin(TAU - 0.45) + osc*0.22;
+            }
+        }else if(ti<40){
+            const baseAng = ((ti-18)*0.65) % TAU;
+            ang = baseAng;
+            const p = circleParam(ang);
+            if(p) [px,py,pz] = p;
+            col = COL_AMBER;
+        }else if(ti<52){
+            const closeT = remap(ti,40,52,0,1);
+            const fullAng = closeT * TAU;
+            ang = fullAng;
+            const p = [MAIN_RADIUS*Math.cos(ang), MAIN_RADIUS*Math.sin(ang), 0];
+            [px,py,pz] = p;
+            col = COL_AMBER.clone().lerp(COL_CYAN, closeT);
+        }else{
+            ang = (i/COUNT_MAIN)*TAU + t*0.06;
+            px = MAIN_RADIUS*Math.cos(ang);
+            py = MAIN_RADIUS*Math.sin(ang);
+            col = COL_CYAN;
+        }
+        const off = curl(px*0.4, py*0.4, t*0.2);
+        px += off[0]*0.22;
+        py += off[1]*0.22;
+        pz += off[2]*0.22;
+        for(let k=0;k<=TRAIL_STEPS;k++){
+            const trailFac = 1 - k/(TRAIL_STEPS+1);
+            const idx = (i*(TRAIL_STEPS+1)+k)*3;
+            posMain[idx] = px;
+            posMain[idx+1] = py;
+            posMain[idx+2] = pz;
+            colMain[idx] = col.r * trailFac;
+            colMain[idx+1] = col.g * trailFac;
+            colMain[idx+2] = col.b * trailFac;
+            sizMain[i*(TRAIL_STEPS+1)+k] = size * trailFac;
+        }
+    }
+    const posDebris = bufDebris.pos;
+    const colDebris = bufDebris.col;
+    const sizDebris = bufDebris.siz;
+    posDebris.fill(0); colDebris.fill(0); sizDebris.fill(0);
+    for(let i=0;i<COUNT_DEBRIS;i++){
+        const rt = rng();
+        const ang = rt * TAU;
+        const r = MAIN_RADIUS + rng()*0.7;
+        let x = r*Math.cos(ang);
+        let y = r*Math.sin(ang);
+        const vel = curl(x*0.3,y*0.3,t*0.25);
+        x += vel[0]*0.3;
+        y += vel[1]*0.3;
+        const c = COL_AMBER.clone();
+        c.multiplyScalar(0.25 + rng()*0.35);
+        const s = 0.06 + rng()*0.11;
+        const idx = i*3;
+        posDebris[idx] = x;
+        posDebris[idx+1] = y;
+        posDebris[idx+2] = 0;
+        colDebris[idx] = c.r;
+        colDebris[idx+1] = c.g;
+        colDebris[idx+2] = c.b;
+        sizDebris[i] = s;
+    }
+    const posNeuron = bufNeuron.pos;
+    const colNeuron = bufNeuron.col;
+    const sizNeuron = bufNeuron.siz;
+    posNeuron.fill(0); colNeuron.fill(0); sizNeuron.fill(0);
+    for(let i=0;i<COUNT_NEURON;i++){
+        const ang = rng()*TAU;
+        const rr = 4 + rng()*12;
+        const x = rr*Math.cos(ang);
+        const y = rr*Math.sin(ang);
+        const z = (rng()-0.5)*6;
+        const v = curl(x*0.12,y*0.12,z*0.12 + t*0.1);
+        const c = COL_BG.clone();
+        c.multiplyScalar(0.22 + rng()*0.15);
+        const s = 0.04 + rng()*0.08;
+        const idx = i*3;
+        posNeuron[idx] = x + v[0]*0.12;
+        posNeuron[idx+1] = y + v[1]*0.12;
+        posNeuron[idx+2] = z + v[2]*0.12;
+        colNeuron[idx] = c.r;
+        colNeuron[idx+1] = c.g;
+        colNeuron[idx+2] = c.b;
+        sizNeuron[i] = s;
+    }
+    const posBokeh = bufBokeh.pos;
+    const colBokeh = bufBokeh.col;
+    const sizBokeh = bufBokeh.siz;
+    posBokeh.fill(0); colBokeh.fill(0); sizBokeh.fill(0);
+    for(let i=0;i<COUNT_BOKEH;i++){
+        const ang = rng()*TAU;
+        const rr = 7 + rng()*16;
+        const x = rr*Math.cos(ang);
+        const y = rr*Math.sin(ang);
+        const z = -8 - rng()*10;
+        const c = new THREE.Color(0.85,0.75,0.62);
+        c.multiplyScalar(0.18 + rng()*0.22);
+        const s = 0.6 + rng()*1.4;
+        const idx = i*3;
+        posBokeh[idx] = x;
+        posBokeh[idx+1] = y;
+        posBokeh[idx+2] = z;
+        colBokeh[idx] = c.r;
+        colBokeh[idx+1] = c.g;
+        colBokeh[idx+2] = c.b;
+        sizBokeh[i] = s;
+    }
+    bufMain.geo.attributes.position.needsUpdate = true;
+    bufMain.geo.attributes.color.needsUpdate = true;
+    bufMain.geo.attributes.size.needsUpdate = true;
+    bufDebris.geo.attributes.position.needsUpdate = true;
+    bufDebris.geo.attributes.color.needsUpdate = true;
+    bufDebris.geo.attributes.size.needsUpdate = true;
+    bufNeuron.geo.attributes.position.needsUpdate = true;
+    bufNeuron.geo.attributes.color.needsUpdate = true;
+    bufNeuron.geo.attributes.size.needsUpdate = true;
+    bufBokeh.geo.attributes.position.needsUpdate = true;
+    bufBokeh.geo.attributes.color.needsUpdate = true;
+    bufBokeh.geo.attributes.size.needsUpdate = true;
+    const camP = getCamPos(rawT);
+    const camL = getCamLook(rawT);
+    camera.position.copy(camP);
+    camera.lookAt(camL);
+    renderer.render(scene, camera);
+}
+window.renderAt = renderAt;
+window.ready = true;
+if(CAPTURE){
+    renderAt(CAP_T);
+}else{
+    function loop(){
+        const now = performance.now() / 1000;
+        const animT = now % TOTAL_DUR;
+        renderAt(animT);
+        requestAnimationFrame(loop);
+    }
+    loop();
+}
+})();
+</script>
+</body>
+</html>
